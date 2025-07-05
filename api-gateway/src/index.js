@@ -14,7 +14,7 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    max: 1000 // limit each IP to 1000 requests per windowMs
 }));
 app.use(express.json());
 
@@ -34,7 +34,9 @@ const authenticateJWT = (req, res, next) => {
 
         jwt.verify(token, JWT_SECRET, (err, user) => {
             if (err) {
-                return res.status(403).send('Invalid token.');
+                if (err.name === 'TokenExpiredError') {
+                    return res.status(401).send('Token expired. Please log in again.');
+                }
             }
 
             // Attach user information to the request, including the userId
@@ -142,6 +144,31 @@ app.use((err, req, res, next) => {
     if (!res.headersSent) {
         res.status(500).send('An internal error occurred in the API Gateway.');
     }
+});
+
+// Middleware to format all numbers in JSON responses to two decimal digits
+app.use((req, res, next) => {
+    const oldJson = res.json;
+    res.json = function (data) {
+        function formatNumbers(obj) {
+            if (Array.isArray(obj)) {
+                return obj.map(formatNumbers);
+            } else if (obj && typeof obj === 'object') {
+                const newObj = {};
+                for (const key in obj) {
+                    if (typeof obj[key] === 'number') {
+                        newObj[key] = Number.isInteger(obj[key]) ? obj[key] : Number(obj[key].toFixed(2));
+                    } else {
+                        newObj[key] = formatNumbers(obj[key]);
+                    }
+                }
+                return newObj;
+            }
+            return obj;
+        }
+        return oldJson.call(this, formatNumbers(data));
+    };
+    next();
 });
 
 const PORT = process.env.PORT || 3000;

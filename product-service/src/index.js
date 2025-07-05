@@ -86,7 +86,7 @@ const { authenticateJWT } = require('./middleware/auth');
 
 // API Endpoints
 app.get('/api/products', async (req, res) => {
-    const { search, sortBy, order } = req.query;
+    const { search, sortBy, order, page = 1, pageSize = 10 } = req.query;
     const where = {};
     const orderBy = {};
 
@@ -103,9 +103,19 @@ app.get('/api/products', async (req, res) => {
 
     const products = await prisma.product.findMany({
         where,
-        orderBy
+        orderBy,
+        skip: (parseInt(page) - 1) * parseInt(pageSize),
+        take: parseInt(pageSize)
     });
-    res.json(products);
+
+    const totalProducts = await prisma.product.count({ where });
+
+    res.json({
+        products,
+        totalProducts,
+        totalPages: Math.ceil(totalProducts / pageSize),
+        currentPage: parseInt(page)
+    });
 });
 
 // Get a single product by ID

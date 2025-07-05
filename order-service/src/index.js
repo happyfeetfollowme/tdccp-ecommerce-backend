@@ -41,11 +41,31 @@ app.get('/api/cart', authenticateJWT, async (req, res) => {
     if (!cart) {
         cart = await prisma.cart.create({ data: { userId: req.userId, items: [] } });
     }
-    res.json(cart);
+    // Enrich items with imageUrl from product if missing
+    const itemsWithImageUrl = cart.items && Array.isArray(cart.items)
+        ? await Promise.all(
+            cart.items.map(async item => {
+                if (!item.imageUrl && item.productId) {
+                    // Try to fetch product from DB
+                    if (prisma.product && typeof prisma.product.findUnique === 'function') {
+                        const product = await prisma.product.findUnique({ where: { id: item.productId } });
+                        return {
+                            ...item,
+                            imageUrl: product && product.imageUrl ? product.imageUrl : null
+                        };
+                    } else {
+                        return { ...item, imageUrl: null };
+                    }
+                }
+                return item;
+            })
+        )
+        : [];
+    res.json({ ...cart, items: itemsWithImageUrl });
 });
 
 app.post('/api/cart/items', authenticateJWT, async (req, res) => {
-    const { productId, name, price, quantity, walletAddress } = req.body;
+    const { productId, name, price, quantity, walletAddress, imageUrl } = req.body;
     let cart = await prisma.cart.findUnique({ where: { userId: req.userId } });
 
     if (!cart) {
@@ -58,7 +78,7 @@ app.post('/api/cart/items', authenticateJWT, async (req, res) => {
     if (existingItemIndex > -1) {
         items[existingItemIndex].quantity += quantity;
     } else {
-        items.push({ productId, name, price, quantity, walletAddress });
+        items.push({ productId, name, price, quantity, walletAddress, imageUrl });
     }
 
     const updatedCart = await prisma.cart.update({
