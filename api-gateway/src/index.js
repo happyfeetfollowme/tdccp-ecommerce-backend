@@ -120,6 +120,19 @@ app.use('/api/orders', proxy(ORDER_SERVICE_URL, {
         return proxyReqOpts;
     }
 }));
+
+// Proxy admin order endpoints to order-service
+app.use('/api/admin/orders', proxy(ORDER_SERVICE_URL, {
+    proxyReqPathResolver: function (req) {
+        return req.originalUrl;
+    },
+    proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
+        if (srcReq.user) {
+            proxyReqOpts.headers['X-User-Id'] = srcReq.user.userId;
+        }
+        return proxyReqOpts;
+    }
+}));
 app.use('/api/cart', proxy(ORDER_SERVICE_URL, {
     proxyReqPathResolver: function (req) {
         return req.originalUrl;

@@ -105,6 +105,27 @@ app.put('/api/users/me', authenticateJWT, async (req, res) => {
     res.json(updatedUser);
 });
 
+// Batch fetch users by userIds (for admin order page)
+app.post('/api/users/batch', async (req, res) => {
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({ error: 'userIds must be a non-empty array' });
+    }
+    try {
+        const users = await prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: {
+                id: true,
+                discordId: true,
+                discordUsername: true,
+            }
+        });
+        res.json(users);
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch users' });
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 
 let server;
