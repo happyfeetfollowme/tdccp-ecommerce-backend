@@ -1,0 +1,77 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  discordId    String  @unique
+  discordUsername String?
+  role         Role    @default(USER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  price         Float
+  imageUrl      String
+  stock         Int
+  preservedStock Int @default(0)
+  walletAddress String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  amount      Float
+  status      String   // e.g., PENDING, COMPLETED, FAILED
+  transaction String?  // Solana transaction signature
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  userId      String
+  status      OrderStatus @default(PROCESSING)
+  total       Float
+  shippingFee Float       @default(0.0)
+  items       Json        // Denormalized list of product details
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  items     Json     // Denormalized list of product details
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum OrderStatus {
+  PROCESSING
+  WAITING_FOR_PAYMENT
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELED
+}
+
