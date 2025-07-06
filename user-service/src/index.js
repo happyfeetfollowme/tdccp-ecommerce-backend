@@ -62,7 +62,7 @@ passport.use(new DiscordStrategy({
 app.get('/api/auth/discord', passport.authenticate('discord'));
 
 app.get('/api/auth/discord/callback', passport.authenticate('discord', { failureRedirect: 'http://localhost:8080/login-error' }), (req, res) => {
-    const token = jwt.sign({ userId: req.user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: req.user.id }, process.env.JWT_SECRET, { expiresIn: '12h' });
     res.redirect(`http://localhost:8080/auth/discord/callback?token=${token}`);
 });
 
@@ -78,6 +78,7 @@ const authenticateJWT = (req, res, next) => {
 };
 
 app.get('/api/users/me', authenticateJWT, async (req, res) => {
+    res.set('Cache-Control', 'no-store'); // Always return fresh data
     console.log("/api/users/me endpoint hit");
     console.log("User ID from token:", req.user.userId);
     const user = await prisma.user.findUnique({ 

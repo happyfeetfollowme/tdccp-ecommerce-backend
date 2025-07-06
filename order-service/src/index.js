@@ -34,6 +34,7 @@ const publishEvent = (eventName, data) => {
 };
 
 const { authenticateJWT } = require('./middleware/auth');
+const axios = require('axios');
 
 // Cart Management
 app.get('/api/cart', authenticateJWT, async (req, res) => {
@@ -198,6 +199,18 @@ app.get('/api/orders/:id', authenticateJWT, async (req, res) => {
     res.json(order);
 });
 
+// Helper to fetch user role from user service
+async function getUserRole(userId) {
+    try {
+        const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+        const response = await axios.get(`${userServiceUrl}/api/users/${userId}/role`);
+        return response.data.role;
+    } catch (error) {
+        console.error('Error fetching user role:', error.message);
+        return null;
+    }
+}
+
 // Admin Endpoints
 app.get('/api/admin/orders', authenticateJWT, async (req, res) => {
     // In a real app, you'd add admin role check here
@@ -208,17 +221,48 @@ app.get('/api/admin/orders', authenticateJWT, async (req, res) => {
 app.put('/api/admin/orders/:id', authenticateJWT, async (req, res) => {
     // In a real app, you'd add admin role check here
     const { id } = req.params;
-    const { status, shippingFee, total } = req.body;
+    // Only update fields that are present in the request body
+    const allowedFields = ["status", "shippingFee", "total", "address", "items", "userId"];
+    const data = {};
+    for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+            data[field] = req.body[field];
+        }
+    }
 
     const updatedOrder = await prisma.order.update({
         where: { id },
-        data: { status, shippingFee, total }
+        data
     });
 
-    if (status) {
+    if (data.status) {
         publishEvent('OrderStatusUpdated', { orderId: updatedOrder.id, newStatus: updatedOrder.status });
     }
 
+    res.json(updatedOrder);
+});
+
+// User endpoint to cancel their own order
+app.put('/api/orders/:id', authenticateJWT, async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    // Only allow canceling if status is CANCELED
+    if (status !== 'CANCELED') {
+        return res.status(400).json({ error: 'Only cancellation is allowed for this endpoint.' });
+    }
+    // Find the order and ensure it belongs to the user
+    const order = await prisma.order.findUnique({ where: { id, userId: req.userId } });
+    if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+    }
+    // Only allow cancel if order is PROCESSING or WAITING_FOR_PAYMENT
+    if (order.status !== 'PROCESSING' && order.status !== 'WAITING_FOR_PAYMENT') {
+        return res.status(400).json({ error: 'Order cannot be canceled in its current status.' });
+    }
+    const updatedOrder = await prisma.order.update({
+        where: { id },
+        data: { status: 'CANCELED' }
+    });
     res.json(updatedOrder);
 });
 
