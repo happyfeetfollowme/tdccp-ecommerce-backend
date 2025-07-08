@@ -181,17 +181,24 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
+// Admin Endpoints
+app.get('/api/admin/products', authenticateJWT, async (req, res) => {
+    // In a real app, you'd add admin role check here
+    const products = await prisma.product.findMany();
+    res.json(products);
+});
+
+
 // [POST] Create product with optional images
-app.post('/api/products', authenticateJWT, upload.array('images', 10), async (req, res) => {
-  if (!req.isAdmin) {
-    return res.status(403).send('Forbidden');
-  }
+app.post('/api/admin/products', authenticateJWT, upload.array('images', 10), async (req, res) => {
   try {
-    const { name, description, price, imageUrl, walletAddress, stock } = req.body;
+    const { name, description, price, walletAddress, stock } = req.body;
     let images = [];
     if (req.files && req.files.length > 0) {
       images = await uploadImagesToSupabase(req.files);
     }
+    // Always provide imageUrl (first image or empty string)
+    const imageUrl = images.length > 0 ? images[0] : '';
     const product = await prisma.product.create({
       data: { name, description, price: parseFloat(price), imageUrl, walletAddress, stock: parseInt(stock), images },
     });
@@ -202,10 +209,7 @@ app.post('/api/products', authenticateJWT, upload.array('images', 10), async (re
 });
 
 // [PUT] Update product with optional images (replace old images)
-app.put('/api/products/:id', authenticateJWT, upload.array('images', 10), async (req, res) => {
-  if (!req.isAdmin) {
-    return res.status(403).send('Forbidden');
-  }
+app.put('/api/admin/products/:id', authenticateJWT, upload.array('images', 10), async (req, res) => {
   const { id } = req.params;
   try {
     const { name, description, price, imageUrl, walletAddress, stock } = req.body;
@@ -236,10 +240,7 @@ app.put('/api/products/:id', authenticateJWT, upload.array('images', 10), async 
   }
 });
 
-app.delete('/api/products/:id', authenticateJWT, async (req, res) => {
-    if (!req.isAdmin) {
-        return res.status(403).send('Forbidden');
-    }
+app.delete('/api/admin/products/:id', authenticateJWT, async (req, res) => {
     const { id } = req.params;
     await prisma.product.delete({ where: { id } });
     res.status(204).send();

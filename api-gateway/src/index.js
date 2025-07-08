@@ -133,6 +133,17 @@ app.use('/api/admin/orders', proxy(ORDER_SERVICE_URL, {
         return proxyReqOpts;
     }
 }));
+app.use('/api/admin/products', proxy(PRODUCT_SERVICE_URL, {
+    proxyReqPathResolver: function (req) {
+        return req.originalUrl;
+    },
+    proxyReqOptDecorator: function(proxyReqOpts, srcReq) {
+        if (srcReq.user) {
+            proxyReqOpts.headers['X-User-Id'] = srcReq.user.userId;
+        }
+        return proxyReqOpts;
+    }
+}));
 app.use('/api/cart', proxy(ORDER_SERVICE_URL, {
     proxyReqPathResolver: function (req) {
         return req.originalUrl;
