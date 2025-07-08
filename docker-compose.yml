@@ -1,8 +1,8 @@
 version: '3.9'
 services:
   api-gateway:
-    build: ./api-gateway
-    container_name: api-gateway
+    build: .
+    container_name: api-gateway/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -20,40 +20,41 @@ services:
   user-service:
     build:
       context: .
-      dockerfile: ./user-service/Dockerfile
+      dockerfile: user-service/Dockerfile
     container_name: user-service
     ports:
       - "3001:3001"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres
       - JWT_SECRET="duUlkw8n1sCKmOwznJ0373lV1IoIsSdUjt5+mPZEn54="
       - SESSION_SECRET="BFHjuM3c8LYJRJ8ixfxcxcJ83GylZQ/4cBKCXWIQP0w="
       - DISCORD_CLIENT_ID="1390240283316195358"
       - DISCORD_CLIENT_SECRET="kvCIj1ytgcn7uiT7SdQQ_4QyxBfvlDSs"
       - DISCORD_CALLBACK_URL=http://localhost:3000/api/auth/discord/callback
-      - PRISMA_SCHEMA_PATH=../prisma/schema.prisma
 
   product-service:
     build:
       context: .
-      dockerfile: ./product-service/Dockerfile
+      dockerfile: product-service/Dockerfile
     container_name: product-service
     ports:
       - "3002:3002"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres
       - RABBITMQ_URL=amqp://rabbitmq:5672
-      - PRISMA_SCHEMA_PATH=../prisma/schema.prisma
 
   order-service:
     build:
       context: .
-      dockerfile: ./order-service/Dockerfile
+      dockerfile: order-service/Dockerfile
     container_name: order-service
     ports:
       - "3003:3003"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres
       - RABBITMQ_URL=amqp://rabbitmq:5672
     depends_on:
       - rabbitmq
@@ -61,16 +62,26 @@ services:
   payment-service:
     build:
       context: .
-      dockerfile: ./payment-service/Dockerfile
+      dockerfile: payment-service/Dockerfile
     container_name: payment-service
     ports:
       - "3004:3004"
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - SOLANA_RPC_URL=https://api.devnet.solana.com
       - SHOP_WALLET_ADDRESS=
-      - PRISMA_SCHEMA_PATH=../prisma/schema.prisma
+
+  prisma-migrate:
+    build:
+      context: .
+      dockerfile: ./prisma-db/Dockerfile
+    container_name: prisma-migrate
+    env_file:
+      - .env
+    depends_on:
+      - rabbitmq
 
   rabbitmq:
     image: rabbitmq:3-management

@@ -4,8 +4,9 @@ WORKDIR /usr/src/app
 
 # Copy package.json and lock file
 COPY ./user-service/package*.json ./
-# Copy shared prisma folder
-COPY ../prisma ./prisma
+# Copy centralized prisma-db folder
+COPY prisma-db/prisma ./prisma
+COPY prisma-db/src ./prisma-db/src
 # Install dependencies
 RUN npm install
 # Generate Prisma client
