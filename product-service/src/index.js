@@ -2,9 +2,20 @@ require('dotenv').config();
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const amqp = require('amqplib');
+const multer = require('multer');
+const { createClient } = require('@supabase/supabase-js');
 
 const prisma = new PrismaClient();
 const app = express();
+
+// Multer setup for file uploads (memory storage)
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Supabase client setup
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY // Use service role for upload
+);
 
 app.use(express.json());
 
@@ -84,6 +95,40 @@ connectRabbitMQ();
 
 const { authenticateJWT } = require('./middleware/auth');
 
+// Helper to upload images to Supabase
+async function uploadImagesToSupabase(files) {
+  const uploadedUrls = [];
+  for (const file of files) {
+    const fileExt = file.originalname.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+    const filePath = `${fileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('images')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false
+      });
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+    const { data: publicUrlData } = supabase.storage.from('images').getPublicUrl(filePath);
+    uploadedUrls.push(publicUrlData.publicUrl);
+  }
+  return uploadedUrls;
+}
+
+// Helper to delete images from Supabase
+async function deleteImagesFromSupabase(urls) {
+  for (const url of urls) {
+    const parts = url.split('/');
+    const idx = parts.findIndex(p => p === 'images');
+    if (idx !== -1 && parts.length > idx + 1) {
+      const filePath = parts.slice(idx + 1).join('/');
+      await supabase.storage.from('images').remove([filePath]);
+    }
+  }
+}
+
 // API Endpoints
 app.get('/api/products', async (req, res) => {
     const { search, sortBy, order, page = 1, pageSize = 10 } = req.query;
@@ -136,28 +181,59 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-app.post('/api/products', authenticateJWT, async (req, res) => {
-    if (!req.isAdmin) {
-        return res.status(403).send('Forbidden');
-    }
+// [POST] Create product with optional images
+app.post('/api/products', authenticateJWT, upload.array('images', 10), async (req, res) => {
+  if (!req.isAdmin) {
+    return res.status(403).send('Forbidden');
+  }
+  try {
     const { name, description, price, imageUrl, walletAddress, stock } = req.body;
+    let images = [];
+    if (req.files && req.files.length > 0) {
+      images = await uploadImagesToSupabase(req.files);
+    }
     const product = await prisma.product.create({
-        data: { name, description, price, imageUrl, walletAddress, stock }
+      data: { name, description, price: parseFloat(price), imageUrl, walletAddress, stock: parseInt(stock), images },
     });
     res.status(201).json(product);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-app.put('/api/products/:id', authenticateJWT, async (req, res) => {
-    if (!req.isAdmin) {
-        return res.status(403).send('Forbidden');
-    }
-    const { id } = req.params;
+// [PUT] Update product with optional images (replace old images)
+app.put('/api/products/:id', authenticateJWT, upload.array('images', 10), async (req, res) => {
+  if (!req.isAdmin) {
+    return res.status(403).send('Forbidden');
+  }
+  const { id } = req.params;
+  try {
     const { name, description, price, imageUrl, walletAddress, stock } = req.body;
+    let images;
+    if (req.files && req.files.length > 0) {
+      // Get old images
+      const oldProduct = await prisma.product.findUnique({ where: { id } });
+      if (oldProduct && oldProduct.images && Array.isArray(oldProduct.images)) {
+        await deleteImagesFromSupabase(oldProduct.images);
+      }
+      images = await uploadImagesToSupabase(req.files);
+    }
     const updatedProduct = await prisma.product.update({
-        where: { id },
-        data: { name, description, price, imageUrl, walletAddress, stock }
+      where: { id },
+      data: {
+        name,
+        description,
+        price: price !== undefined ? parseFloat(price) : undefined,
+        imageUrl,
+        walletAddress,
+        stock: stock !== undefined ? parseInt(stock) : undefined,
+        ...(images ? { images } : {})
+      }
     });
     res.json(updatedProduct);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.delete('/api/products/:id', authenticateJWT, async (req, res) => {
@@ -174,4 +250,4 @@ const server = app.listen(PORT, () => {
     console.log(`Product service listening on port ${PORT}`);
 });
 
-module.exports = { app, server };
+module.exports = { app, server, uploadImagesToSupabase };

@@ -1,3 +1,5 @@
+console.log('Running product-service.test.js');
+
 const request = require('supertest');
 const { PrismaClient } = require('@prisma/client');
 
@@ -15,33 +17,42 @@ jest.mock('@prisma/client', () => {
             create: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
+            count: jest.fn(), // Mock the count method
         },
-        // Mock prisma.order if product-service's event handlers for OrderPaid/OrderCanceled
-        // were to actually use it (currently they use event.data.items or have it commented out)
-        /*
-        order: {
-            findUnique: jest.fn(),
-        }
-        */
     };
     return { PrismaClient: jest.fn(() => mPrismaClient) };
 });
 
 // Mock amqplib
 jest.mock('amqplib', () => ({
-    connect: jest.fn().mockResolvedValue({ // Ensure connect returns a Promise
-        createChannel: jest.fn().mockResolvedValue({ // Ensure createChannel returns a Promise
+    connect: jest.fn().mockResolvedValue({
+        createChannel: jest.fn().mockResolvedValue({
             assertQueue: jest.fn().mockResolvedValue(undefined),
-            publish: jest.fn(), // Product service doesn't publish, but good to have
+            publish: jest.fn(),
             consume: jest.fn((queue, callback) => {
-                capturedConsumeCallback = callback; // Capture the callback
-                // console.log(`Mock amqp: consume called for queue ${queue}, callback captured.`);
+                capturedConsumeCallback = callback;
             }),
             ack: mockAmqpChannelAck,
             nack: mockAmqpChannelNack,
         }),
     }),
 }));
+
+// Mock Supabase
+const mockSupabaseClient = {
+    storage: {
+        from: jest.fn().mockReturnThis(),
+        upload: jest.fn().mockResolvedValue({ error: null }),
+        getPublicUrl: jest.fn(filePath => ({
+            data: { publicUrl: `https://mock-bucket.supabase.co/images/${filePath}` }
+        })),
+        remove: jest.fn().mockResolvedValue({ error: null }),
+    },
+};
+jest.mock('@supabase/supabase-js', () => ({
+    createClient: jest.fn(() => mockSupabaseClient),
+}));
+
 
 // Mock Auth Middleware
 jest.mock('../src/middleware/auth', () => ({
@@ -51,10 +62,9 @@ jest.mock('../src/middleware/auth', () => ({
     })
 }));
 
-const prisma = new PrismaClient(); // Instance of mocked PrismaClient
+const prisma = new PrismaClient();
 
 // Import the actual app after mocks are set up
-// process.env.RABBITMQ_URL = 'amqp://testhost'; // Example if specific test URL needed for RabbitMQ mock
 const { app, server } = require('../src/index');
 
 // This code runs once after all tests in this file are done.
@@ -65,33 +75,31 @@ afterAll(async () => {
 describe('Product Service API', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        // Reset captured consume callback before each test if it's triggered per test
-        // capturedConsumeCallback = undefined; // This might be too early if app setup is async
         mockAmqpChannelAck.mockClear();
         mockAmqpChannelNack.mockClear();
-
-        // Ensure the Prisma mock methods are cleared if they are reused across tests
-        // This happens automatically with jest.clearAllMocks() for jest.fn() instances
-        // on the mPrismaClient object returned by the PrismaClient mock constructor.
     });
 
     describe('GET /api/products', () => {
         test('should return a list of products', async () => {
             const mockProducts = [{ id: 'prod1', name: 'Product 1' }];
             prisma.product.findMany.mockResolvedValue(mockProducts);
+            prisma.product.count.mockResolvedValue(mockProducts.length);
 
             const res = await request(app).get('/api/products');
 
             expect(res.statusCode).toEqual(200);
-            expect(res.body).toEqual(mockProducts);
+            expect(res.body.products).toEqual(mockProducts);
             expect(prisma.product.findMany).toHaveBeenCalledWith({
                 where: {},
                 orderBy: {},
+                skip: 0,
+                take: 10,
             });
         });
 
         test('should filter products by search term', async () => {
-            prisma.product.findMany.mockResolvedValue([]); // Default mock response
+            prisma.product.findMany.mockResolvedValue([]);
+            prisma.product.count.mockResolvedValue(0);
             await request(app).get('/api/products?search=Product');
             expect(prisma.product.findMany).toHaveBeenCalledWith({
                 where: {
@@ -101,15 +109,20 @@ describe('Product Service API', () => {
                     ],
                 },
                 orderBy: {},
+                skip: 0,
+                take: 10,
             });
         });
 
         test('should sort products', async () => {
-            prisma.product.findMany.mockResolvedValue([]); // Default mock response
+            prisma.product.findMany.mockResolvedValue([]);
+            prisma.product.count.mockResolvedValue(0);
             await request(app).get('/api/products?sortBy=price&order=desc');
             expect(prisma.product.findMany).toHaveBeenCalledWith({
                 where: {},
                 orderBy: { price: 'desc' },
+                skip: 0,
+                take: 10,
             });
         });
     });
@@ -174,7 +187,7 @@ describe('Product Service API', () => {
 
     describe('DELETE /api/products/:id', () => {
         test('should delete a product if admin', async () => {
-            prisma.product.delete.mockResolvedValue({}); // Return value doesn't usually matter for delete
+            prisma.product.delete.mockResolvedValue({});
             const res = await request(app)
                 .delete('/api/products/prod1')
                 .set('x-admin', 'true');
@@ -188,32 +201,21 @@ describe('Product Service API', () => {
     });
 
     describe('RabbitMQ Event Consumption', () => {
-        // Helper to wait for async operations within consume callback if any were truly async
         const flushPromises = () => new Promise(setImmediate);
 
         test('should decrement stock and increment preservedStock on OrderCreated event', async () => {
-            // Ensure capturedConsumeCallback is defined (app has initialized RabbitMQ connection)
-            // This might require a small delay or a more robust way to await RabbitMQ connection in tests
-            await flushPromises(); // Wait for connectRabbitMQ to potentially run
-            if (!capturedConsumeCallback) {
-                 // If connectRabbitMQ hasn't completed and set capturedConsumeCallback yet
-                 // we might need to wait. Forcing it for test assumes it would be set.
-                console.warn("capturedConsumeCallback not set, RabbitMQ mock might not have been fully initialized by app.")
-                const amqp = require('amqplib'); // get the mock
-                capturedConsumeCallback = amqp.connect().createChannel().consume.mock.calls[0][1];
-            }
+            await flushPromises();
             if (!capturedConsumeCallback) throw new Error("Consume callback not captured");
-
 
             const msg = {
                 content: Buffer.from(JSON.stringify({
                     eventName: 'OrderCreated',
                     data: { items: [{ productId: 'prod1', quantity: 2 }] }
                 })),
-                fields: { deliveryTag: 1 } // Mock deliveryTag
+                fields: { deliveryTag: 1 }
             };
             await capturedConsumeCallback(msg);
-            await flushPromises(); // Allow async operations inside callback to complete
+            await flushPromises();
 
             expect(prisma.product.update).toHaveBeenCalledWith({
                 where: { id: 'prod1' },
@@ -229,16 +231,9 @@ describe('Product Service API', () => {
             await flushPromises();
             if (!capturedConsumeCallback) throw new Error("Consume callback not captured for OrderPaid test");
 
-            // In src/index.js, OrderPaid handler uses data.items if available,
-            // and the commented out prisma.order.findUnique is not used.
-            // So, we don't need to mock prisma.order.findUnique for this test based on current src.
             const msg = {
                 content: Buffer.from(JSON.stringify({
                     eventName: 'OrderPaid',
-                    // IMPORTANT: The actual src/index.js for OrderPaid relies on data.items,
-                    // or a prisma.order.findUnique call (which is commented out).
-                    // For this test to align with the *current* code that uses event.data.items,
-                    // the event data must contain items.
                     data: { orderId: 'order1', items: [{ productId: 'prod1', quantity: 2 }] }
                 })),
                 fields: { deliveryTag: 2 }
@@ -259,7 +254,6 @@ describe('Product Service API', () => {
             await flushPromises();
             if (!capturedConsumeCallback) throw new Error("Consume callback not captured for OrderCanceled test");
 
-            // Similar to OrderPaid, ensure event data has items if src/index.js relies on it.
             const msg = {
                 content: Buffer.from(JSON.stringify({
                     eventName: 'OrderCanceled',
@@ -278,6 +272,89 @@ describe('Product Service API', () => {
                 }
             });
             expect(mockAmqpChannelAck).toHaveBeenCalledWith(msg);
+        });
+    });
+
+    describe('Product Image Upload API', () => {
+        it('should create a product with images', async () => {
+            const newProductData = {
+                name: 'Test Product',
+                description: 'desc',
+                price: 10.5,
+                walletAddress: 'wallet',
+                stock: 5,
+            };
+            // The actual URL will be generated by the Supabase mock
+            const expectedImages = ['https://mock-bucket.supabase.co/images/test-image.png'];
+            prisma.product.create.mockResolvedValue({ id: 'newProdId', ...newProductData, images: expectedImages });
+
+            const imagePath = require('path').join(__dirname, 'test-image.png');
+            require('fs').writeFileSync(imagePath, 'fake-image-data');
+
+            const res = await request(app)
+                .post('/api/products')
+                .set('x-admin', 'true')
+                .field('name', 'Test Product')
+                .field('description', 'desc')
+                .field('price', '10.5')
+                .field('walletAddress', 'wallet')
+                .field('stock', '5')
+                .attach('images', imagePath, 'test-image.png');
+
+            require('fs').unlinkSync(imagePath);
+
+            expect(res.statusCode).toBe(201);
+            expect(res.body.images[0]).toContain('https://mock-bucket.supabase.co/images');
+            expect(prisma.product.create).toHaveBeenCalledWith({
+                data: expect.objectContaining({
+                    name: 'Test Product',
+                    images: expect.any(Array),
+                })
+            });
+        });
+
+        it('should update a product and replace images', async () => {
+            const productId = 'prod123';
+            const originalProduct = {
+                id: productId,
+                name: 'Test Product 2',
+                images: ['https://mock-bucket.supabase.co/images/old-image.png']
+            };
+            const updatedProductData = {
+                id: productId,
+                name: 'Test Product 2 Updated',
+                images: ['https://mock-bucket.supabase.co/images/new-image.png']
+            };
+
+            prisma.product.findUnique.mockResolvedValue(originalProduct);
+            prisma.product.update.mockResolvedValue(updatedProductData);
+
+            const imagePath = require('path').join(__dirname, 'test-image2.png');
+            require('fs').writeFileSync(imagePath, 'fake-image-data-2');
+
+            const res = await request(app)
+                .put(`/api/products/${productId}`)
+                .set('x-admin', 'true')
+                .field('name', 'Test Product 2 Updated')
+                .attach('images', imagePath, 'new-image.png');
+
+            require('fs').unlinkSync(imagePath);
+
+            expect(res.statusCode).toBe(200);
+            expect(res.body.name).toBe('Test Product 2 Updated');
+            expect(res.body.images[0]).toContain('https://mock-bucket.supabase.co/images/new-image.png');
+
+            // Verify that the old image was deleted
+            expect(mockSupabaseClient.storage.remove).toHaveBeenCalledWith(['old-image.png']);
+            
+            // Verify that prisma update was called correctly
+            expect(prisma.product.update).toHaveBeenCalledWith({
+                where: { id: productId },
+                data: expect.objectContaining({
+                    name: 'Test Product 2 Updated',
+                    images: expect.any(Array),
+                })
+            });
         });
     });
 });
