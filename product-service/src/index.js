@@ -200,7 +200,7 @@ app.post('/api/admin/products', authenticateJWT, upload.array('images', 10), asy
     // Always provide imageUrl (first image or empty string)
     const imageUrl = images.length > 0 ? images[0] : '';
     const product = await prisma.product.create({
-      data: { name, description, price: parseFloat(price), imageUrl, walletAddress, stock: parseInt(stock), images },
+      data: { name, description, price: parseFloat(price), imageUrl, walletAddress, stock: parseInt(stock) },
     });
     res.status(201).json(product);
   } catch (error) {
@@ -212,15 +212,14 @@ app.post('/api/admin/products', authenticateJWT, upload.array('images', 10), asy
 app.put('/api/admin/products/:id', authenticateJWT, upload.array('images', 10), async (req, res) => {
   const { id } = req.params;
   try {
-    const { name, description, price, imageUrl, walletAddress, stock } = req.body;
-    let images;
+    const { name, description, price, walletAddress, stock } = req.body;
+    let imageUrl;
     if (req.files && req.files.length > 0) {
-      // Get old images
+      // Get old imageUrl
       const oldProduct = await prisma.product.findUnique({ where: { id } });
-      if (oldProduct && oldProduct.images && Array.isArray(oldProduct.images)) {
-        await deleteImagesFromSupabase(oldProduct.images);
-      }
-      images = await uploadImagesToSupabase(req.files);
+      // Optionally, you could delete the old image from Supabase here if needed
+      const uploadedImages = await uploadImagesToSupabase(req.files);
+      imageUrl = uploadedImages.length > 0 ? uploadedImages[0] : (oldProduct ? oldProduct.imageUrl : '');
     }
     const updatedProduct = await prisma.product.update({
       where: { id },
@@ -228,10 +227,9 @@ app.put('/api/admin/products/:id', authenticateJWT, upload.array('images', 10), 
         name,
         description,
         price: price !== undefined ? parseFloat(price) : undefined,
-        imageUrl,
+        imageUrl: imageUrl !== undefined ? imageUrl : undefined,
         walletAddress,
-        stock: stock !== undefined ? parseInt(stock) : undefined,
-        ...(images ? { images } : {})
+        stock: stock !== undefined ? parseInt(stock) : undefined
       }
     });
     res.json(updatedProduct);
