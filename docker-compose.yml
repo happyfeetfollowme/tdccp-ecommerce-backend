@@ -1,10 +1,14 @@
 version: '3.9'
 services:
   api-gateway:
-    build: .
-    container_name: api-gateway/Dockerfile
+    build:
+      context: .
+      dockerfile: ./api-gateway/Dockerfile # Consistent dockerfile path
+    container_name: api-gateway # Corrected container name
     ports:
       - "3000:3000"
+    env_file: # Added for consistency with other services
+      - .env
     environment:
       - USER_SERVICE_URL=http://user-service:3001
       - PRODUCT_SERVICE_URL=http://product-service:3002
@@ -16,6 +20,7 @@ services:
       - product-service
       - order-service
       - payment-service
+      - prisma-migrate # Added dependency to ensure migrations run first
 
   user-service:
     build:
@@ -27,11 +32,14 @@ services:
     env_file:
       - .env
     environment:
+      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres # Added DATABASE_URL
       - JWT_SECRET="duUlkw8n1sCKmOwznJ0373lV1IoIsSdUjt5+mPZEn54="
       - SESSION_SECRET="BFHjuM3c8LYJRJ8ixfxcxcJ83GylZQ/4cBKCXWIQP0w="
       - DISCORD_CLIENT_ID="1390240283316195358"
       - DISCORD_CLIENT_SECRET="kvCIj1ytgcn7uiT7SdQQ_4QyxBfvlDSs"
       - DISCORD_CALLBACK_URL=http://localhost:3000/api/auth/discord/callback
+    depends_on:
+      - prisma-migrate # Added dependency to ensure migrations run first
 
   product-service:
     build:
@@ -43,7 +51,10 @@ services:
     env_file:
       - .env
     environment:
+      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres # Added DATABASE_URL
       - RABBITMQ_URL=amqp://rabbitmq:5672
+    depends_on:
+      - prisma-migrate # Added dependency to ensure migrations run first
 
   order-service:
     build:
@@ -55,9 +66,11 @@ services:
     env_file:
       - .env
     environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres # Added DATABASE_URL
       - RABBITMQ_URL=amqp://rabbitmq:5672
     depends_on:
       - rabbitmq
+      - prisma-migrate # Added dependency to ensure migrations run first
 
   payment-service:
     build:
@@ -69,9 +82,13 @@ services:
     env_file:
       - .env
     environment:
+      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres # Added DATABASE_URL
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - SOLANA_RPC_URL=https://api.devnet.solana.com
       - SHOP_WALLET_ADDRESS=
+    depends_on:
+      - rabbitmq
+      - prisma-migrate # Added dependency to ensure migrations run first
 
   prisma-migrate:
     build:
@@ -80,8 +97,6 @@ services:
     container_name: prisma-migrate
     env_file:
       - .env
-    depends_on:
-      - rabbitmq
 
   rabbitmq:
     image: rabbitmq:3-management
