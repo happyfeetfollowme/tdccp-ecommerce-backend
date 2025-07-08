@@ -4,9 +4,8 @@ const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+const { prisma } = require('../../prisma-db/src');
 
-const prisma = new PrismaClient();
 const app = express();
 
 app.use(express.json());

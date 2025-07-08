@@ -1,11 +1,10 @@
 require('dotenv').config();
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const amqp = require('amqplib');
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
+const { prisma } = require('../../prisma-db/src');
 
-const prisma = new PrismaClient();
 const app = express();
 
 // Multer setup for file uploads (memory storage)

@@ -1,9 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
 const amqp = require('amqplib');
+const { prisma } = require('../../prisma-db/src');
 
-const prisma = new PrismaClient();
 const app = express();
 
 app.use(express.json());
@@ -134,10 +133,12 @@ app.delete('/api/cart/items/:id', authenticateJWT, async (req, res) => {
 // Order Management
 app.post('/api/orders', authenticateJWT, async (req, res) => {
     const cart = await prisma.cart.findUnique({ where: { userId: req.userId } });
-
     if (!cart || !cart.items || cart.items.length === 0) {
         return res.status(400).send('Cart is empty');
     }
+
+    // Get shippingInfo from request body
+    const { shippingInfo } = req.body;
 
     const itemsByWallet = cart.items.reduce((acc, item) => {
         const wallet = item.walletAddress || 'default'; // Group by walletAddress
@@ -153,12 +154,14 @@ app.post('/api/orders', authenticateJWT, async (req, res) => {
         const orderItems = itemsByWallet[wallet];
         const total = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
+        // Store shippingInfo as JSON in the shippingInfo field (if you want a dedicated field, add to schema)
         const order = await prisma.order.create({
             data: {
                 userId: req.userId,
                 status: 'PROCESSING',
                 total,
                 items: orderItems,
+                shippingInfo: shippingInfo ? shippingInfo : null,
             }
         });
         createdOrders.push(order);
@@ -214,7 +217,9 @@ async function getUserRole(userId) {
 // Admin Endpoints
 app.get('/api/admin/orders', authenticateJWT, async (req, res) => {
     // In a real app, you'd add admin role check here
-    const orders = await prisma.order.findMany();
+    const orders = await prisma.order.findMany({
+        orderBy: { createdAt: 'desc' }
+    });
     res.json(orders);
 });
 
@@ -222,7 +227,7 @@ app.put('/api/admin/orders/:id', authenticateJWT, async (req, res) => {
     // In a real app, you'd add admin role check here
     const { id } = req.params;
     // Only update fields that are present in the request body
-    const allowedFields = ["status", "shippingFee", "total", "address", "items", "userId"];
+    const allowedFields = ["status", "shippingFee", "total", "shippingInfo", "items", "userId"];
     const data = {};
     for (const field of allowedFields) {
         if (req.body[field] !== undefined) {

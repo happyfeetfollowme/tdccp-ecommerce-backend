@@ -11,6 +11,9 @@
   "author": "",
   "license": "ISC",
   "description": "",
+  "prisma": {
+    "schema": "../prisma/schema.prisma"
+  },
   "dependencies": {
     "@prisma/client": "^6.11.0",
     "@solana/pay": "^0.2.5",

@@ -43,7 +43,8 @@ CREATE TABLE "Payment" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Payment_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Payment_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Payment_orderId_key" UNIQUE ("orderId")
 );
 
 -- CreateTable
@@ -68,17 +69,6 @@ CREATE TABLE "Cart" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Cart_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Cart_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Cart_userId_key" UNIQUE ("userId")
 );
-
--- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "User_discordId_key" ON "User"("discordId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Payment_orderId_key" ON "Payment"("orderId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Cart_userId_key" ON "Cart"("userId");

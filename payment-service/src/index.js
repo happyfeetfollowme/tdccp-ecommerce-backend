@@ -1,11 +1,10 @@
 require('dotenv').config();
 const express = require('express');
-const { PrismaClient } = require('@prisma/client');
-const { Connection, PublicKey, Keypair, Transaction } = require('@solana/web3.js');
+const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
 const { createQR, encodeURL, findReference, validateTransfer, FindReferenceError, ValidateTransferError } = require('@solana/pay');
 const amqp = require('amqplib');
+const { prisma } = require('../../prisma-db/src');
 
-const prisma = new PrismaClient();
 const app = express();
 
 app.use(express.json());
