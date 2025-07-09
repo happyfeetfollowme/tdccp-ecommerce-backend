@@ -16,8 +16,7 @@ services:
         value: https://payment-service:3004
       - key: JWT_SECRET
         sync: false
-    autoDeploy: true
-    repo: .
+    autoDeploy: false
     rootDir: api-gateway
 
   - type: web
@@ -39,8 +38,7 @@ services:
         sync: false
       - key: DISCORD_CALLBACK_URL
         sync: false
-    autoDeploy: true
-    repo: .
+    autoDeploy: false
     rootDir: user-service
 
   - type: web
@@ -58,8 +56,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-    autoDeploy: true
-    repo: .
+    autoDeploy: false
     rootDir: product-service
 
   - type: web
@@ -73,8 +70,7 @@ services:
         sync: false
       - key: RABBITMQ_URL
         sync: false
-    autoDeploy: true
-    repo: .
+    autoDeploy: false
     rootDir: order-service
 
   - type: web
@@ -92,8 +88,7 @@ services:
         sync: false
       - key: SHOP_WALLET_ADDRESS
         sync: false
-    autoDeploy: true
-    repo: .
+    autoDeploy: false
     rootDir: payment-service
 
   - type: worker
@@ -105,6 +100,5 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-    autoDeploy: true
-    repo: .
+    autoDeploy: false
     rootDir: prisma-db
