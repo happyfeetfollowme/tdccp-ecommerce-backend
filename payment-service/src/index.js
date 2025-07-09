@@ -121,8 +121,8 @@ app.get('/api/payments/verify', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT;
-const server = app.listen(PORT, () => {
+const PORT = process.env.PORT || 3004;
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Payment service listening on port ${PORT}`);
 });
 

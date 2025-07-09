@@ -243,8 +243,8 @@ app.delete('/api/admin/products/:id', authenticateJWT, async (req, res) => {
     res.status(204).send();
 });
 
-const PORT = process.env.PORT;
-const server = app.listen(PORT, () => {
+const PORT = process.env.PORT || 3002;
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Product service listening on port ${PORT}`);
 });
 

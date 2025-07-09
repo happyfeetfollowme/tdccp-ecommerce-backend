@@ -127,13 +127,8 @@ app.post('/api/users/batch', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-
-let server;
-
-if (require.main === module) {
-    server = app.listen(PORT, () => {
-        console.log(`User service listening on port ${PORT}`);
-    });
-}
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`User service listening on port ${PORT}`);
+});
 
 module.exports = { app, server };

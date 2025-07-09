@@ -277,8 +277,8 @@ app.get('/api/debug/user', authenticateJWT, async (req, res) => {
     res.json({ userId: req.userId, message: "Current authenticated user" });
 });
 
-const PORT = process.env.PORT;
-const server = app.listen(PORT, () => {
+const PORT = process.env.PORT || 3003;
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Order service listening on port ${PORT}`);
 });
 
