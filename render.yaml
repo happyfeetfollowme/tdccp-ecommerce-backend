@@ -1,0 +1,110 @@
+services:
+  - type: web
+    name: api-gateway
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: USER_SERVICE_URL
+        value: https://user-service:3001
+      - key: PRODUCT_SERVICE_URL
+        value: https://product-service:3002
+      - key: ORDER_SERVICE_URL
+        value: https://order-service:3003
+      - key: PAYMENT_SERVICE_URL
+        value: https://payment-service:3004
+      - key: JWT_SECRET
+        sync: false
+    autoDeploy: true
+    repo: .
+    rootDir: api-gateway
+
+  - type: web
+    name: user-service
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate --schema=../prisma-db/prisma/schema.prisma
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_CALLBACK_URL
+        sync: false
+    autoDeploy: true
+    repo: .
+    rootDir: user-service
+
+  - type: web
+    name: product-service
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate --schema=../prisma-db/prisma/schema.prisma
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+    autoDeploy: true
+    repo: .
+    rootDir: product-service
+
+  - type: web
+    name: order-service
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate --schema=../prisma-db/prisma/schema.prisma
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
+    autoDeploy: true
+    repo: .
+    rootDir: order-service
+
+  - type: web
+    name: payment-service
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate --schema=../prisma-db/prisma/schema.prisma
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
+      - key: SOLANA_RPC_URL
+        sync: false
+      - key: SHOP_WALLET_ADDRESS
+        sync: false
+    autoDeploy: true
+    repo: .
+    rootDir: payment-service
+
+  - type: worker
+    name: prisma-migrate
+    env: node
+    plan: free
+    buildCommand: npm install -g prisma
+    startCommand: npx prisma migrate deploy --schema=prisma/schema.prisma
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+    autoDeploy: true
+    repo: .
+    rootDir: prisma-db
