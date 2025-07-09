@@ -1,4 +1,4 @@
-# TDCCP E-commerce Backend Monorepo
+# E-commerce Backend Monorepo
 
 This backend monorepo for the E-commerce platform is built in close collaboration with the GitHub Copilot agent, combining developer expertise with AI-powered assistance for a robust, scalable, and well-documented architecture.
 
