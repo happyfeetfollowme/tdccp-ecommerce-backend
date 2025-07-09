@@ -9,27 +9,17 @@ WORKDIR /usr/src/app
 # --- 1. Setup the shared 'prisma-db' module ---
 # Create the directory for prisma-db within the app's root
 RUN mkdir -p prisma-db
-
-# Copy prisma-db's package files
 COPY prisma-db/package.json ./prisma-db/
 COPY prisma-db/package-lock.json ./prisma-db/
 
 # Install prisma-db dependencies (assuming it has its own)
 WORKDIR /usr/src/app/prisma-db
 RUN npm install
-
-# Copy prisma-db source (now in JavaScript, so no build step needed)
 COPY prisma-db/src ./src
-
-# --- 2. Copy the centralized Prisma schema ---
-# Go back to the root of the app directory
-WORKDIR /usr/src/app
 COPY prisma-db/prisma ./prisma
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
-# Generate Prisma client (using the copied schema)
-RUN npx prisma generate --schema=prisma/schema.prisma
-
-# --- 3. Setup the 'payment-service' module ---
+# --- 2. Setup the 'payment-service' module ---
 # Create the directory for payment-service within the app's root
 RUN mkdir -p payment-service
 
@@ -42,10 +32,9 @@ COPY payment-service/package-lock.json ./
 # Use --omit=dev to install only production dependencies, reducing image size
 RUN npm install --omit=dev
 
-# Copy payment-service's source code and other necessary files (like tests, .gitignore)
+# Copy payment-service's source code and other necessary files (like tests)
 COPY payment-service/src ./src
 COPY payment-service/tests ./tests
-COPY payment-service/.gitignore ./
 
 # Expose the port the service listens on
 EXPOSE 3004

@@ -14,23 +14,16 @@ RUN mkdir -p prisma-db
 COPY prisma-db/package.json ./prisma-db/
 COPY prisma-db/package-lock.json ./prisma-db/
 
-# Install prisma-db dependencies (assuming it has its own)
+# Change WORKDIR to prisma-db's directory to install its dependencies and generate Prisma Client locally
 WORKDIR /usr/src/app/prisma-db
 RUN npm install
-
-# Copy prisma-db source (now in JavaScript, so no build step needed)
 COPY prisma-db/src ./src
-
-# --- 2. Copy the centralized Prisma schema ---
-# Go back to the root of the app directory
-WORKDIR /usr/src/app
 COPY prisma-db/prisma ./prisma
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
-# Generate Prisma client (using the copied schema)
-RUN npx prisma generate --schema=prisma/schema.prisma
-
-# --- 3. Setup the 'product-service' module ---
+# --- 2. Setup the 'product-service' module ---
 # Create the directory for product-service within the app's root
+WORKDIR /usr/src/app
 RUN mkdir -p product-service
 
 # Copy product-service's package files
@@ -42,10 +35,9 @@ COPY product-service/package-lock.json ./
 # Use --omit=dev to install only production dependencies, reducing image size
 RUN npm install --omit=dev
 
-# Copy product-service's source code and other necessary files (like tests, .gitignore)
+# Copy product-service's source code and other necessary files (like tests)
 COPY product-service/src ./src
 COPY product-service/tests ./tests
-COPY product-service/.gitignore ./
 
 # Expose the port the service listens on
 EXPOSE 3002

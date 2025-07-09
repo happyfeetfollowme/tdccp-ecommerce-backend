@@ -18,7 +18,6 @@ RUN npm install --omit=dev
 # Again, paths are relative to the monorepo root.
 COPY ./api-gateway/src ./src
 COPY ./api-gateway/tests ./tests
-COPY ./api-gateway/.gitignore ./
 
 # Expose the port the service listens on
 EXPOSE 3000

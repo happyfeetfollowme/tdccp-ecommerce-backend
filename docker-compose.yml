@@ -53,6 +53,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres # Added DATABASE_URL
       - RABBITMQ_URL=amqp://rabbitmq:5672
+      - SUPABASE_URL=https://vdirafzcvmbdltbepgcp.supabase.co
+      - SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkaXJhZnpjdm1iZGx0YmVwZ2NwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTc5Njc3OSwiZXhwIjoyMDY3MzcyNzc5fQ.whDAK773Un7qVBGhy-xl9qvk49DXwQIwggeX37Ra3oM
     depends_on:
       - prisma-migrate # Added dependency to ensure migrations run first
 
