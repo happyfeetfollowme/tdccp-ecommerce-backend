@@ -6,26 +6,17 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      # You can't use 'url' with fromService.
+      # Instead, construct the URL from the service name and port.
+      # Render's internal network lets services talk to each other using their names.
       - key: USER_SERVICE_URL
-        fromService:
-          type: web
-          name: user-service
-          property: url
+        value: http://user-service:4001
       - key: PRODUCT_SERVICE_URL
-        fromService:
-          type: web
-          name: product-service
-          property: url
+        value: http://product-service:4002
       - key: ORDER_SERVICE_URL
-        fromService:
-          type: web
-          name: order-service
-          property: url
+        value: http://order-service:4003
       - key: PAYMENT_SERVICE_URL
-        fromService:
-          type: web
-          name: payment-service
-          property: url
+        value: http://payment-service:4004
       - key: JWT_SECRET
         sync: false
     autoDeploy: true
@@ -39,10 +30,7 @@ services:
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: prisma-db
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: SESSION_SECRET
@@ -64,10 +52,7 @@ services:
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: prisma-db
-          property: connectionString
+        sync: false
       - key: RABBITMQ_URL
         sync: false
       - key: SUPABASE_URL
@@ -85,11 +70,10 @@ services:
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: prisma-db
-          property: connectionString
+        sync: false
       - key: RABBITMQ_URL
+        sync: false
+      - key: JWT_SECRET
         sync: false
     autoDeploy: true
     rootDir: order-service
@@ -102,10 +86,7 @@ services:
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: prisma-db
-          property: connectionString
+        sync: false
       - key: RABBITMQ_URL
         sync: false
       - key: SOLANA_RPC_URL
@@ -123,14 +104,6 @@ services:
     startCommand: npx prisma migrate deploy --schema=./prisma/schema.prisma
     envVars:
       - key: DATABASE_URL
-        fromService:
-          type: pserv
-          name: prisma-db
-          property: connectionString
+        sync: false
     autoDeploy: true
     rootDir: prisma-db
-
-  - type: pserv
-    name: prisma-db
-    env: node
-    plan: free
