@@ -32,11 +32,10 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres # Added DATABASE_URL
       - JWT_SECRET="duUlkw8n1sCKmOwznJ0373lV1IoIsSdUjt5+mPZEn54="
       - SESSION_SECRET="BFHjuM3c8LYJRJ8ixfxcxcJ83GylZQ/4cBKCXWIQP0w="
-      - DISCORD_CLIENT_ID="1390240283316195358"
-      - DISCORD_CLIENT_SECRET="kvCIj1ytgcn7uiT7SdQQ_4QyxBfvlDSs"
+      - DISCORD_CLIENT_ID=1390240283316195358
+      - DISCORD_CLIENT_SECRET=kvCIj1ytgcn7uiT7SdQQ_4QyxBfvlDSs
       - DISCORD_CALLBACK_URL=http://localhost:3000/api/auth/discord/callback
     depends_on:
       - prisma-migrate # Added dependency to ensure migrations run first
@@ -51,7 +50,6 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres # Added DATABASE_URL
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - SUPABASE_URL=https://vdirafzcvmbdltbepgcp.supabase.co
       - SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkaXJhZnpjdm1iZGx0YmVwZ2NwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTc5Njc3OSwiZXhwIjoyMDY3MzcyNzc5fQ.whDAK773Un7qVBGhy-xl9qvk49DXwQIwggeX37Ra3oM
@@ -68,8 +66,8 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/postgres # Added DATABASE_URL
       - RABBITMQ_URL=amqp://rabbitmq:5672
+      - JWT_SECRET="duUlkw8n1sCKmOwznJ0373lV1IoIsSdUjt5+mPZEn54="
     depends_on:
       - rabbitmq
       - prisma-migrate # Added dependency to ensure migrations run first
@@ -84,7 +82,6 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:38KC%24%25S8V4M9JwS@db.vdirafzcvmbdltbepgcp.supabase.co:5432/postgres # Added DATABASE_URL
       - RABBITMQ_URL=amqp://rabbitmq:5672
       - SOLANA_RPC_URL=https://api.devnet.solana.com
       - SHOP_WALLET_ADDRESS=

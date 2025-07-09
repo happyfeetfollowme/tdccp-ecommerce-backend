@@ -19,7 +19,8 @@ app.use(rateLimit({
 app.use(express.json());
 
 // A key for signing the JWT. In a real application, this should be stored securely.
-const JWT_SECRET = process.env.JWT_SECRET || 'your-default-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+console.log(`Using JWT secret: ${JWT_SECRET}`);
 
 // Authentication middleware
 const authenticateJWT = (req, res, next) => {
@@ -37,8 +38,12 @@ const authenticateJWT = (req, res, next) => {
                 if (err.name === 'TokenExpiredError') {
                     return res.status(401).send('Token expired. Please log in again.');
                 }
+                // Handle all other JWT verification errors
+                // This ensures a response is sent and execution stops before trying to access 'user.userId'
+                return res.status(403).send('Invalid token.');
             }
 
+            // If no error, 'user' will contain the decoded JWT payload
             // Attach user information to the request, including the userId
             req.user = user;
             // Pass the userId to downstream services in a custom header
@@ -196,7 +201,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`API Gateway is running on port ${PORT}`);
 });
 
