@@ -1,6 +1,6 @@
 # E-commerce Backend Monorepo
 
-This backend monorepo for the E-commerce platform is built in close collaboration with the GitHub Copilot agent, combining developer expertise with AI-powered assistance for a robust, scalable, and well-documented architecture.
+This backend monorepo for the E-commerce platform is built in close collaboration with the AI agents, combining developer expertise with AI-powered assistance for a robust, scalable, and well-documented architecture.
 
 It contains all backend microservices, a centralized Prisma database package, and configuration for local development and cloud deployment (Docker, Render, Supabase, etc).
 
