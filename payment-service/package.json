@@ -2,10 +2,15 @@
   "name": "payment-service",
   "version": "1.0.0",
   "main": "index.js",
+
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest --config jest.config.js"
+    "test": "jest --config jest.config.js",
+    "test:coverage": "jest --config jest.config.js --coverage",
+    "test:watch": "jest --config jest.config.js --watch",
+    "test:ci": "jest --config jest.config.js --coverage --ci --watchAll=false",
+    "test:verbose": "VERBOSE_TESTS=true jest --config jest.config.js --verbose"
   },
   "keywords": [],
   "author": "",
