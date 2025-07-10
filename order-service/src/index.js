@@ -132,49 +132,59 @@ app.delete('/api/cart/items/:id', authenticateJWT, async (req, res) => {
 
 // Order Management
 app.post('/api/orders', authenticateJWT, async (req, res) => {
-    const cart = await prisma.cart.findUnique({ where: { userId: req.userId } });
-    if (!cart || !cart.items || cart.items.length === 0) {
-        return res.status(400).send('Cart is empty');
-    }
+    try {
+        const cart = await prisma.cart.findUnique({ where: { userId: req.userId } });
 
-    // Get shippingInfo from request body
-    const { shippingInfo } = req.body;
-
-    const itemsByWallet = cart.items.reduce((acc, item) => {
-        const wallet = item.walletAddress || 'default'; // Group by walletAddress
-        if (!acc[wallet]) {
-            acc[wallet] = [];
+        if (!cart || !cart.items || !Array.isArray(cart.items) || cart.items.length === 0) {
+            return res.status(400).send('Cart is empty');
         }
-        acc[wallet].push(item);
-        return acc;
-    }, {});
 
-    const createdOrders = [];
-    for (const wallet in itemsByWallet) {
-        const orderItems = itemsByWallet[wallet];
-        const total = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const { shippingInfo } = req.body || {}; // Ensure req.body exists before destructuring
 
-        // Store shippingInfo as JSON in the shippingInfo field (if you want a dedicated field, add to schema)
-        const order = await prisma.order.create({
-            data: {
-                userId: req.userId,
-                status: 'PROCESSING',
-                total,
-                items: orderItems,
-                shippingInfo: shippingInfo ? shippingInfo : null,
+        const itemsByWallet = cart.items.reduce((acc, item) => {
+            const wallet = item.walletAddress || 'default';
+            if (!acc[wallet]) {
+                acc[wallet] = [];
             }
+            acc[wallet].push(item);
+            return acc;
+        }, {});
+
+        const createdOrders = [];
+        for (const wallet in itemsByWallet) {
+            const orderItems = itemsByWallet[wallet];
+            const total = orderItems.reduce((sum, item) => {
+                 if (typeof item.price !== 'number' || typeof item.quantity !== 'number') {
+                    // This console.error can remain as it's a useful validation log
+                    console.error('Invalid price or quantity for item during order creation:', item);
+                    throw new Error('Invalid item price or quantity encountered in total calculation.');
+                }
+                return sum + (item.price * item.quantity);
+            }, 0);
+
+            const order = await prisma.order.create({
+                data: {
+                    userId: req.userId,
+                    status: 'PROCESSING',
+                    total,
+                    items: orderItems,
+                    shippingInfo: shippingInfo ? shippingInfo : null,
+                }
+            });
+            createdOrders.push(order);
+            publishEvent('OrderCreated', { orderId: order.id, userId: order.userId, items: order.items });
+        }
+        await prisma.cart.update({
+            where: { id: cart.id },
+            data: { items: [] }
         });
-        createdOrders.push(order);
-        publishEvent('OrderCreated', { orderId: order.id, userId: order.userId, items: order.items });
+
+        res.status(201).json(createdOrders);
+    } catch (error) {
+        // Generic error log for the route
+        console.error('Error in POST /api/orders route:', error);
+        res.status(500).json({ message: "Internal server error in orders.", details: error.message });
     }
-
-    // Clear the cart after creating orders
-    await prisma.cart.update({
-        where: { id: cart.id },
-        data: { items: [] }
-    });
-
-    res.status(201).json(createdOrders);
 });
 
 app.get('/api/orders', authenticateJWT, async (req, res) => {

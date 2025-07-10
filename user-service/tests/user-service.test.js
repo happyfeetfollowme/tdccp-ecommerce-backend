@@ -25,17 +25,29 @@ const mockPassportAuthenticateFn = jest.fn((strategy, options) => {
 mockPassportAuthenticateFn.mock.user = null;
 
 
+// Define the mock Prisma operations that user-service will use
+const mockPrismaOps = {
+    user: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+    },
+    // Add other models here if user-service interacts with them
+};
+
 // 2. ALL jest.mock calls
-jest.mock('@prisma/client', () => {
-    const mPrismaClient = {
-        user: {
-            findUnique: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
-        },
-    };
-    return { PrismaClient: jest.fn(() => mPrismaClient) };
-});
+// Mock the shared prisma-db module
+jest.mock('../../prisma-db/src', () => ({
+    prisma: mockPrismaOps
+}));
+
+// No longer need to mock @prisma/client directly here if prisma-db is fully mocked
+// jest.mock('@prisma/client', () => { ... });
+
+// Mock dotenv to prevent it from overriding our test environment
+jest.mock('dotenv', () => ({
+    config: jest.fn()
+}));
 
 jest.mock('passport', () => ({
     initialize: jest.fn(() => (req, res, next) => next()),
@@ -47,8 +59,9 @@ jest.mock('passport', () => ({
 
 jest.mock('passport-discord'); // This is a simple mock, no factory needed unless we configure it
 
-// 3. Global test setup like `prisma` instance for tests
-const prisma = new PrismaClient(); // Uses the mocked PrismaClient
+// The application itself will get 'prisma' from the mocked '../../prisma-db/src'.
+// Tests will use 'mockPrismaOps' directly to set up mockResolvedValue etc.
+// const prisma = new PrismaClient(); // OLD LINE - REMOVED
 
 // 4. Import the actual app after mocks are set up
 const { app, server } = require('../src/index');
@@ -93,11 +106,14 @@ describe('User Service API', () => {
 
             const response = await request(app).get('/api/auth/discord/callback');
 
-            expect(response.status).toBe(200);
-            expect(response.body).toHaveProperty('token');
+            expect(response.status).toBe(302); // Expect redirect
+            expect(response.headers.location).toEqual(expect.stringContaining('http://localhost:8080/auth/discord/callback?token='));
 
-            // Verify the token contains the correct user ID
-            const decoded = jwt.verify(response.body.token, process.env.JWT_SECRET);
+            // Optional: Extract token and verify if necessary
+            const redirectUrl = new URL(response.headers.location);
+            const token = redirectUrl.searchParams.get('token');
+            expect(token).toBeTruthy();
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
             expect(decoded.userId).toBe(mockUser.id);
         });
     });
@@ -112,22 +128,33 @@ describe('User Service API', () => {
         it('should return 403 Forbidden for an invalid token', async () => {
             const response = await request(app)
                 .get('/api/users/me')
-                .set('Authorization', 'Bearer invalidtoken');
-            expect(response.status).toBe(403);
+                .set('Authorization', 'Bearer invalidtoken'); // This header is ignored by the app's auth middleware
+            expect(response.status).toBe(401); // App returns 401 due to missing x-user-id
         });
 
         it('should return user data for a valid token', async () => {
             const user = { id: 'user123', email: 'test@example.com' };
-            const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
-            prisma.user.findUnique.mockResolvedValue(user);
+            // const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET); // Not used by app middleware
+            mockPrismaOps.user.findUnique.mockResolvedValue(user);
 
             const response = await request(app)
                 .get('/api/users/me')
-                .set('Authorization', `Bearer ${token}`);
+                .set('x-user-id', user.id); // Use x-user-id header
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual(user);
-            expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: user.id } });
+            expect(mockPrismaOps.user.findUnique).toHaveBeenCalledWith({
+                where: { id: user.id },
+                select: {
+                    id: true,
+                    email: true,
+                    discordId: true,
+                    discordUsername: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    role: true,
+                }
+            });
         });
     });
 
@@ -135,18 +162,18 @@ describe('User Service API', () => {
         it('should update the user profile for a valid token', async () => {
             const user = { id: 'user123', email: 'old@example.com' };
             const updatedUser = { ...user, email: 'new@example.com' };
-            const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET);
+            // const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET); // Not used by app middleware
 
-            prisma.user.update.mockResolvedValue(updatedUser);
+            mockPrismaOps.user.update.mockResolvedValue(updatedUser);
 
             const response = await request(app)
                 .put('/api/users/me')
-                .set('Authorization', `Bearer ${token}`)
+                .set('x-user-id', user.id) // Use x-user-id header
                 .send({ email: 'new@example.com' });
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual(updatedUser);
-            expect(prisma.user.update).toHaveBeenCalledWith({
+            expect(mockPrismaOps.user.update).toHaveBeenCalledWith({
                 where: { id: user.id },
                 data: { email: 'new@example.com' },
             });

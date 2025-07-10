@@ -14,17 +14,25 @@ const mockAmqpConnection = {
     createChannel: jest.fn().mockResolvedValue(mockAmqpChannel),
 };
 
+// Define the mock Prisma operations that payment-service will use
+const mockPrismaOps = {
+    payment: {
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+    },
+    // Add other models here if payment-service interacts with them
+    // e.g., order: { findUnique: jest.fn() },
+};
+
 // 2. ALL jest.mock calls
-jest.mock('@prisma/client', () => {
-    const mPrismaClient = {
-        payment: {
-            create: jest.fn(),
-            findUnique: jest.fn(),
-            update: jest.fn(),
-        },
-    };
-    return { PrismaClient: jest.fn(() => mPrismaClient) };
-});
+// Mock the shared prisma-db module
+jest.mock('../../prisma-db/src', () => ({
+    prisma: mockPrismaOps
+}));
+
+// No longer need to mock @prisma/client directly here if prisma-db is fully mocked
+// jest.mock('@prisma/client', () => { ... });
 
 jest.mock('amqplib', () => ({ // This uses mockAmqpConnection
     connect: jest.fn().mockResolvedValue(mockAmqpConnection),
@@ -62,8 +70,14 @@ jest.mock('@solana/pay', () => ({
 }));
 const solanaPay = require('@solana/pay'); // Import the mocked module
 
-// 3. Global test setup like `prisma` instance for tests
-const prisma = new PrismaClient(); // Uses the mocked PrismaClient
+// Mock dotenv to prevent it from overriding our test environment
+jest.mock('dotenv', () => ({
+    config: jest.fn()
+}));
+
+// The application itself will get 'prisma' from the mocked '../../prisma-db/src'.
+// Tests will use 'mockPrismaOps' directly to set up mockResolvedValue etc.
+// const prisma = new PrismaClient(); // OLD LINE - REMOVED
 
 // Mock environment variables - Placed before app import
 process.env.SOLANA_RPC_URL = 'http://mock-solana-rpc';
@@ -87,7 +101,7 @@ describe('Payment Service API', () => {
     describe('POST /api/payments/charge', () => {
         test('should initiate a payment and return Solana Pay URL', async () => {
             const mockPaymentData = { id: 'payment123', orderId: 'order1', amount: 100, status: 'PENDING' };
-            prisma.payment.create.mockResolvedValue(mockPaymentData);
+            mockPrismaOps.payment.create.mockResolvedValue(mockPaymentData);
 
             // Ensure Keypair mock is fresh if it's called multiple times across tests or setup
             // For this test, it's called once inside the route handler.
@@ -100,7 +114,7 @@ describe('Payment Service API', () => {
             expect(res.body).toHaveProperty('paymentId', 'payment123');
             expect(res.body).toHaveProperty('solanaPayUrl', 'mockSolanaPayUrl');
             expect(res.body).toHaveProperty('reference', 'mockReferencePublicKey'); // From Keypair mock
-            expect(prisma.payment.create).toHaveBeenCalledWith({
+            expect(mockPrismaOps.payment.create).toHaveBeenCalledWith({
                 data: {
                     orderId: 'order1',
                     amount: 100,
@@ -123,11 +137,11 @@ describe('Payment Service API', () => {
             const mockPayment = { id: 'payment123', orderId: 'order1', amount: 100, status: 'PENDING' };
             const updatedPayment = { ...mockPayment, status: 'COMPLETED', transaction: 'mockSignature' };
 
-            prisma.payment.findUnique.mockResolvedValue(mockPayment);
+            mockPrismaOps.payment.findUnique.mockResolvedValue(mockPayment);
             // Ensure PublicKey mock handles being called with 'mockReference' and 'mockShopWalletAddress'
             solanaPay.findReference.mockResolvedValue({ signature: 'mockSignature' });
             solanaPay.validateTransfer.mockResolvedValue(true); // Assuming validateTransfer resolves if successful
-            prisma.payment.update.mockResolvedValue(updatedPayment);
+            mockPrismaOps.payment.update.mockResolvedValue(updatedPayment);
 
             const res = await request(app)
                 .get('/api/payments/verify?reference=mockReference&paymentId=payment123');
@@ -135,7 +149,7 @@ describe('Payment Service API', () => {
             expect(res.statusCode).toEqual(200);
             expect(res.body).toHaveProperty('status', 'COMPLETED');
             expect(res.body).toHaveProperty('transaction', 'mockSignature');
-            expect(prisma.payment.update).toHaveBeenCalledWith({
+            expect(mockPrismaOps.payment.update).toHaveBeenCalledWith({
                 where: { id: 'payment123' },
                 data: { status: 'COMPLETED', transaction: 'mockSignature' },
             });
@@ -145,7 +159,7 @@ describe('Payment Service API', () => {
         });
 
         test('should return 404 if payment record not found', async () => {
-            prisma.payment.findUnique.mockResolvedValue(null);
+            mockPrismaOps.payment.findUnique.mockResolvedValue(null);
 
             const res = await request(app)
                 .get('/api/payments/verify?reference=mockReference&paymentId=nonExistentPayment');
@@ -156,7 +170,7 @@ describe('Payment Service API', () => {
 
         test('should return 404 if transaction not found on Solana', async () => {
             const mockPayment = { id: 'payment123', orderId: 'order1', amount: 100, status: 'PENDING' };
-            prisma.payment.findUnique.mockResolvedValue(mockPayment);
+            mockPrismaOps.payment.findUnique.mockResolvedValue(mockPayment);
             // Make sure the error thrown is an instance of the mocked error class
             solanaPay.findReference.mockImplementation(() => { throw new (jest.requireMock('@solana/pay').FindReferenceError)(); });
 
@@ -170,7 +184,7 @@ describe('Payment Service API', () => {
 
         test('should return 400 if transaction validation fails', async () => {
             const mockPayment = { id: 'payment123', orderId: 'order1', amount: 100, status: 'PENDING' };
-            prisma.payment.findUnique.mockResolvedValue(mockPayment);
+            mockPrismaOps.payment.findUnique.mockResolvedValue(mockPayment);
             solanaPay.findReference.mockResolvedValue({ signature: 'mockSignature' });
             solanaPay.validateTransfer.mockImplementation(() => { throw new (jest.requireMock('@solana/pay').ValidateTransferError)(); });
 
