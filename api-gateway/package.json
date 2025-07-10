@@ -5,7 +5,10 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --coverage --ci --watchAll=false"
   },
   "keywords": [],
   "author": "",
@@ -23,6 +26,6 @@
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "supertest": "^7.1.1"
+    "supertest": "^7.1.3"
   }
 }
