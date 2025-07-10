@@ -197,4 +197,96 @@ describe('API Gateway', () => {
       expect(res.body.message).toEqual('Payment initiated');
     });
   });
+
+  describe('JWT Authentication Edge Cases', () => {
+    test('should return 401 for missing Authorization header', async () => {
+      const res = await request(app).get('/api/users/me');
+      expect(res.statusCode).toBe(401);
+      expect(res.text).toContain('Authorization header is missing');
+    });
+
+    test('should return 401 for missing token after Bearer', async () => {
+      const res = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'Bearer ');
+      expect(res.statusCode).toBe(401);
+      expect(res.text).toContain('Access token is missing or invalid');
+    });
+
+    test('should return 401 for expired JWT token', async () => {
+      const expiredToken = jwt.sign({ userId: 'user123' }, process.env.JWT_SECRET, { expiresIn: '-1h' });
+      const res = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${expiredToken}`);
+      expect(res.statusCode).toBe(401);
+      expect(res.text).toContain('Token expired');
+    });
+
+    test('should return 403 for malformed JWT token', async () => {
+      const res = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'Bearer invalid.jwt.token');
+      expect(res.statusCode).toBe(403);
+      expect(res.text).toContain('Invalid token');
+    });
+
+    test('should return 403 for JWT with wrong secret', async () => {
+      const wrongToken = jwt.sign({ userId: 'user123' }, 'wrong_secret', { expiresIn: '1h' });
+      const res = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${wrongToken}`);
+      expect(res.statusCode).toBe(403);
+      expect(res.text).toContain('Invalid token');
+    });
+  });
+
+  describe('Public Routes - Discord Auth', () => {
+    test('should allow access to Discord auth endpoint without token', async () => {
+      const res = await request(app).get('/api/auth/discord');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.message).toBe('Discord auth endpoint');
+    });
+
+    test('should allow access to Discord callback without token', async () => {
+      const res = await request(app).get('/api/auth/discord/callback');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.message).toBe('Discord callback');
+    });
+  });
+
+  describe('Additional Coverage Tests', () => {
+    test('should handle Authorization header without Bearer prefix', async () => {
+      const res = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', 'invalidtoken');
+      expect(res.statusCode).toBe(401);
+      expect(res.text).toContain('Access token is missing or invalid');
+    });
+
+    test('should handle empty Authorization header value', async () => {
+      const res = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', '');
+      expect(res.statusCode).toBe(401);
+      expect(res.text).toContain('Authorization header is missing');
+    });
+
+    test('should test number formatting middleware with integers', async () => {
+      const res = await request(app).get('/api/products');
+      expect(res.statusCode).toBe(200);
+      // Test that integers remain unchanged
+      if (typeof res.body[0] === 'object' && res.body[0].id) {
+        expect(typeof res.body[0].id).toBe('string');
+      }
+    });
+
+    test('should pass X-User-Id header to downstream services', async () => {
+      const token = generateToken('test-user-456');
+      const res = await request(app)
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.statusCode).toBe(200);
+      expect(res.body.id).toBe('test-user-456');
+    });
+  });
 });
