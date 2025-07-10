@@ -5,11 +5,11 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest --detectOpenHandles",
-    "test:coverage": "jest --coverage --detectOpenHandles",
-    "test:watch": "jest --watch --detectOpenHandles",
-    "test:ci": "jest --coverage --ci --watchAll=false --detectOpenHandles",
-    "test:verbose": "VERBOSE_TESTS=true jest --verbose --detectOpenHandles"
+    "test": "jest --config jest.config.js",
+    "test:coverage": "jest --config jest.config.js --coverage",
+    "test:watch": "jest --config jest.config.js --watch",
+    "test:ci": "jest --config jest.config.js --coverage --ci --watchAll=false",
+    "test:verbose": "VERBOSE_TESTS=true jest --config jest.config.js --verbose"
   },
   "keywords": [],
   "author": "",

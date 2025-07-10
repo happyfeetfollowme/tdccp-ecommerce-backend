@@ -351,14 +351,6 @@ describe('Order Service API', () => {
 
             const res = await request(app).post('/api/orders').set('x-user-id', mockUserId);
 
-            // Debug output
-            console.log('Response status:', res.statusCode);
-            console.log('Response body:', res.body);
-            console.log('Response text:', res.text);
-            console.log('Prisma cart.findUnique calls:', prisma.cart.findUnique.mock.calls);
-            console.log('Prisma order.create calls:', prisma.order.create.mock.calls);
-            console.log('AMQP publish calls:', mockAmqpPublish.mock.calls);
-
             expect(res.statusCode).toEqual(201);
             expect(Array.isArray(res.body)).toBe(true);
             expect(res.body.length).toEqual(2); // Two orders created
